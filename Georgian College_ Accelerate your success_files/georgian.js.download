@@ -1,0 +1,59 @@
+(function($){
+  $(document).ready(function(){
+
+    //remove all empty p tags inserted by wordpress editor
+    $("p:empty").remove();
+    $('.georgian-jui-button').button();
+    $('.gcAccordion br').remove();
+    $('.gcAccordion').accordion({
+      collapsible: true,
+      heightStyle: "content",
+      autoHeight: false,
+      active: false      
+    });
+    activatePane(); 
+    $(window).on('hashchange', function(e) {
+      activatePane();
+    });
+    
+    //open events in lightbox
+    $('.wpmudevevents-calendar-event').live('click',function(e){
+      e.preventDefault();
+      showEvent($(this).attr('href'));
+      return false;
+    });
+    //remove video
+    $('.gcyt-overlay, .gcyt-video-wrap, .gcyt-button').live('click',function(){
+      $('.gcyt-overlay').fadeOut(function(){
+        $(this).remove();
+      });
+    });
+  });
+  //show events popup
+  function showEvent(link){
+    // Assign handlers immediately after making the request,
+    // and remember the jqxhr object for this request
+    var jqxhr = $.get(link, function(data) {
+      $('body').append('<div class="gcyt-overlay"><div class="gcyt-video-wrap"><div id="#eventdiv" style="width: 400px; height: auto; margin: 100px auto 0; padding: 20px 30px; background-color: #fff;">'+$(data).find('#page').html()+'</div><button class="georgian-jui-button gcyt-button">Close</button></div></div>').find('.gcyt-button').button();
+    })
+    .done(function() { })
+    .fail(function() { })
+    .always(function() { });
+        
+    if($(window).height() < 550){
+      var h = $(window).height() - 100;
+      var w = h * 1.77;
+      $('#eventdiv').css({'height':h+'px','width':w+'px','margin-top':'50px'});      
+    }    
+  }
+  
+  function activatePane(){ //activate either the hashed pane or the data-active pane
+    $('.gcAccordion').each(function(){      
+      if($(this).find(window.location.hash).length){        
+        $(this).accordion('option','active',window.location.hash);
+      } else {
+        $(this).accordion( "option", "active", (+$(this).attr('data-active') - 1));                
+      }
+    });
+  }
+})(jQuery);

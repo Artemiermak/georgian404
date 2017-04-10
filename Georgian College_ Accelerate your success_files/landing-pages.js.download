@@ -1,0 +1,83 @@
+(function($){
+	$(document).ready(function(){
+		//ready
+		console.log("ready");
+		$('.lp-featured-grid').imagesLoaded( function() {
+			initLpFeaturedGrid();
+			window.setTimeout(function(){
+				initLpFeaturedGrid(); //trigger masonry a second time to close gutter gaps (bug?)
+			}, 100);  
+		});
+
+		$('.lp-featured-grid-item').hover(function(){
+			$(this).find('.lp-featured-grid-content-wrap').css('height', $(this).find('.lp-featured-grid-caption').height() + $(this).find('.lp-featured-grid-content').height() - 15);
+		}, function(){
+			$(this).find('.lp-featured-grid-content-wrap').css('height', 0);
+		});
+		$('.lp-simple-modal').imagesLoaded( function() {
+		  //simpleModalVerticalCenter();
+		});		
+
+	});
+
+	$(document).on('click', '.lp-simple-modal-open', function(e){		
+		e.preventDefault();
+		toggleLPSimpleModal($(this).attr("href"));
+		return false;
+	});
+	$(document).on('click', '.lp-simple-modal-close', function(e){
+		e.preventDefault();
+		$('.lp-simple-modal').fadeOut();
+		return false;
+	});
+	$(window).on('resize', function(){
+		//simpleModalVerticalCenter();
+	});
+
+	function toggleLPSimpleModal(id){	
+		var el = $('[data-modal="' + id + '"]');
+		//simpleModalVerticalCenter(el);	
+		el.fadeToggle().css("display","");
+	}
+	function initLpFeaturedGrid(){
+		// $('.lp-featured-grid').masonry({
+		// 	columnWidth: ".lp-featured-grid-item.one",
+		// 	itemSelector: ".lp-featured-grid-item",
+		// 	gutter: 0
+		// });
+		$('.lp-featured-grid').isotope({
+		  itemSelector: ".lp-featured-grid-item",
+		  columnWidth: ".lp-featured-grid-item.one",
+		  layoutMode: 'packery',
+		});
+	}
+	function simpleModalVerticalCenter(el){
+		el = typeof el !== 'undefined' ? el : $('.lp-simple-modal');
+		el.each(function(){						
+			var previousCss  = $(this).attr("style");
+			$(this)
+			    .css({
+			        position:   'absolute', // Optional if #myDiv is already absolute
+			        visibility: 'hidden',
+			        display:    'block'
+			    });
+			var optionHeight = $(this).find('.content').height(),
+				top = "0",
+				marginTop = (($(window).height() - optionHeight) / 2);
+			if(optionHeight > ($(window).height() * 0.9)) {
+				marginTop = 0;
+				top = "5%";
+			}
+
+			$(this).attr("style", previousCss ? previousCss : "");
+
+			$(this).find('.container.close-wrap').css({
+				'margin-top': marginTop,
+				'top': top
+			});
+			$(this).find('.container').css({
+				'top': top
+			});
+		});		
+	}
+})(jQuery);

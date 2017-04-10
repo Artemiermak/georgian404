@@ -1,0 +1,20 @@
+div#content .georgian-jui-button,
+div#content .georgian-jui-button:link,
+div#content .georgian-jui-button:active,
+div#content .georgian-jui-button:visited {
+  color: #fff !important;
+  text-decoration: none !important;
+}
+div#content .georgian-jui-button:hover {
+  text-decoration: none !important;
+  color: #fff;
+}
+.ui-accordion .ui-accordion-content {
+  padding: 15px;
+}
+.gcAccordionTitle {
+  padding: 8px 10px 6px 30px !important;
+}
+.gcAccordionContent {
+  padding: 15px;
+}

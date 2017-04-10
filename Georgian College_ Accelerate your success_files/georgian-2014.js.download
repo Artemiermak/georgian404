@@ -1,0 +1,418 @@
+// add all URL params to urlParams object
+// var urlParams;
+// (window.onpopstate = function () {
+//     var match,
+//         pl     = /\+/g,  // Regex for replacing addition symbol with a space
+//         search = /([^&=]+)=?([^&]*)/g,
+//         decoded = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+//         encoded = function (s) { return s.replace(pl, " "); },
+//         query  = window.location.search.substring(1);
+
+//     urlParams = {'encoded':{}};
+//     while (match = search.exec(query)){
+//       if (typeof urlParams[decoded(match[1])] === 'undefined') {
+//         urlParams[decoded(match[1])] = [];  
+//       }
+//       if (typeof urlParams['encoded'][decoded(match[1])] === 'undefined') {
+//         urlParams['encoded'][decoded(match[1])] = [];  
+//       }
+//       urlParams[decoded(match[1])].push(decoded(match[2]));
+//       urlParams['encoded'][encoded(match[1])].push(encoded(match[2]));
+//     }       
+// })();
+(function($){  
+  //on ready js
+  $(document).ready(function(){
+    
+    //page load functions to run
+
+    //feedback slidedown
+    initFeedback();
+    
+    //tabbed navigation on main menu
+    addTabIndexes();
+    $(window).resize(function(){ //change tab indexes when resize for mobile menu
+      addTabIndexes();
+    });
+    
+    //fix scrolling in iOS
+    //scrollfix.js
+    if($.browser.mobile){
+      var ScrollFix=function(e){var t,n;e=e||document.querySelector(e);if(!e)return;e.addEventListener("touchstart",function(r){t=r.touches[0].pageY;n=e.scrollTop;if(n<=0)e.scrollTop=1;if(n+e.offsetHeight>=e.scrollHeight)e.scrollTop=e.scrollHeight-e.offsetHeight-1},false)}
+      var scrollingContent = document.getElementById("gcMobileMenu");
+      new ScrollFix(scrollingContent);
+    }    
+  
+    //custom georgian javascript
+    $('#breadcrumb > span > span > a').replaceWith('<a href="/" data-toggle="tooltip" title="Go to home" data-original-title="Go to home" rel="v:url" property="v:title"><i class="icon-lp-home"></i><span style="display: none;">Home</span></a>');
+
+    $('#btn-mobile-nav').on('click',function(){
+      $('body').toggleClass('mobile-nav-open');     
+      if($('#mobile-nav-drawer a[href="'+window.location.href+'"]').length > 0){ //if the current page is within the menu scroll to it 
+        $('#mobile-nav-drawer').scrollTop((($('#mobile-nav-drawer a[href="'+window.location.href+'"]').offset().top + $('#mobile-nav-drawer').scrollTop()) - 118));
+      }             
+      animMobileMenuToggle();
+    });
+    $('.mobile-nav-drawer-menu .sub-menu').parent('li').prepend('<i class="expand">+</i>');
+    $('.mobile-nav-drawer-menu .current-menu-ancestor > .expand, .mobile-nav-drawer-menu .current-menu-item > .expand').text('-');
+    $('.mobile-nav-drawer-menu .expand').on('click', function(){    
+      $(this).siblings('.sub-menu').slideToggle();
+      if($(this).text() == '+'){
+        $(this).text('-');
+      } else {
+        $(this).text('+');
+      }
+    });
+    // if($.browser.mobile){
+    //   $('.layout').swipe({
+    //     swipeLeft:function(event, direction, distance, duration, fingerCount) {
+    //       $('body').removeClass('mobile-nav-open');         
+    //       animMobileMenuToggle();
+    //     },
+    //     swipeRight:function(event, direction, distance, duration, fingerCount) {
+    //       $('body').addClass('mobile-nav-open'); 
+    //       animMobileMenuToggle();
+    //     },
+    //     threshold: 50
+    //   });
+    // }    
+    //end sidebar menu ----------------------------------------------------------------------------------------------------------------------------------//
+  
+    //switch columns around on mobile - NOTNEEDED? deleteme
+    // if (!$('#program-inner-menu').is(':visible')) {
+    //       var programdata = $('#programs').clone();
+    //       $('#programs').remove();
+    //       $('#info').append(programdata);
+    //     }
+  
+    //gc mega menu
+    $('.gc-mega-dropdown li > a').hoverIntent(function(){
+      $(this).parents('.gc-mega-menu-items').siblings('.gc-mega-content-area').empty().append($(this).siblings('.gc-mega-content').html());
+    }, function(){});
+    
+    // left side menu - move active item to top
+    // $('#menu-site-menu-2 > li.current-menu-item, #menu-site-menu-2 > li.current-menu-ancestor, #menu-site-menu-2 > li.current-page-ancestor').each(function(){
+    //   $(this).closest("li").prependTo("#menu-site-menu-2");
+    //   console.log($(this));
+    // });
+    
+    var $container = $('.masonry');
+    $container.imagesLoaded(function(){
+      $container.masonry({
+            itemSelector : '.item',
+            columnWidth : '.item',
+            containerStyle: null
+      });
+    });
+    
+    $('a').on('shown.bs.tab', function (e) {
+      $container.masonry();
+    });
+    
+    //gc mega menu top level right most items move back into the container area
+    //delete due to switching to full width menu with inner grid
+    //adjustMegaMenuPositioning();
+    
+    $('.gc-accordion').accordion({heightStyle: "content", collapsible:"true",active:0});        
+    
+    // accordion 
+    $('.accordion-body').on('show',
+      function(e){
+        $(e.currentTarget).parent().find('.accordion-heading, .accordion-heading .accordion-toggle').toggleClass('active') 
+      }
+    )
+    $('.accordion-body').on('hide',
+      function(e){
+        $(e.currentTarget).parent().find('.accordion-heading, .accordion-heading .accordion-toggle').toggleClass('active') 
+      }
+    )
+    // end accordion 
+    
+    // gcPopUpLinks 
+    $('.gc-lightbox-link').live('click',function(e){
+      console.log('lightbox');
+      e.preventDefault();
+      var thesrc = $(this).attr('href');
+      jQuery('.gc-lightbox, .gc-lightbox-grid-item').remove();
+      if($(this).attr('href').substr($(this).attr('href').length - 3) == 'jpg' || $(this).attr('href').substr($(this).attr('href').length - 3) == 'gif' || $(this).attr('href').substr($(this).attr('href').length - 3) == 'png') {
+        $('body').append('<div class="gc-lightbox"><img style="margin: '+($(window).height()*0.05)+'px auto;" src="'+$(this).attr('href')+'" title="'+$(this).attr('title')+'" alt="'+$(this).attr('title')+'" /></div>');
+      } else if ($(this).attr('data-content') == 'html') {
+        
+        //popup HTML content
+        var item = $(this).parents('.item');
+        var ptop = item.offset().top - $(window).scrollTop();
+        var plef = item.offset().left - $(window).scrollLeft();
+        var pwid = item.width();
+        var phei = item.height();
+        var cont = $(this).parents('.members');
+        var nwid = cont.width();
+        $('<div class="gc-lightbox-grid-item" style="position: fixed; top: '+ptop+'px; left: '+plef+'px; width: '+pwid+'px; height: '+phei+'px;">'+$(this).siblings(".gc-lightbox-html-content").html()+'</div>').appendTo('body').each(function(){
+          $('.gc-lightbox-grid-item').css({
+            'top':'10%',
+            'left':(($(window).width() - nwid) / 2) + 'px',
+            'width':nwid + 'px',
+            'height':'80%',
+            'opacity':'1'
+          });
+        });
+        
+      } else {
+        $('body').append('<div class="gc-lightbox"><iframe style="margin: '+($(window).height()*0.05)+'px auto;" src="'+$(this).attr('href')+'" title="'+$(this).attr('title')+'" alt="'+$(this).attr('title')+'"></iframe><a class="gc-lightbox-close-button" title="Close">&times;</a></div>');
+      }  
+      jQuery('.gc-lightbox').fadeIn();
+      return false;
+    });
+    $(document).on('click', '.gc-lightbox-close-button', function(){
+      $(this).parent('.gc-lightbox').fadeOut(function(){
+        $(this).remove().parent('.gc-lightbox');
+      });
+    });
+    $(document).on('click', '.gc-lightbox, .gc-lightbox-grid-item',function(){
+      $(this).fadeOut(function(){
+        $(this).remove();
+      });
+    });
+    // end gcPopUpLinks    
+    
+    // tabs
+      $('.tabbed a').on('click',function (e) {
+        e.preventDefault();        
+        
+        $(this).tab('show');
+        
+        //implement HTML5 history API to change URLs and load up back/forward button with tab navigation/history
+        //add new tab to the history API and open the tab view   
+        History.pushState(null, $(this).text() + ' - ' + $('.entry-title').clone().children().remove().end().text() + ' - ' + 'Georgian College', $(this).attr('href'));        
+        History.Adapter.bind(window,'statechange',function(){ // Note: We are using statechange instead of popstate          
+          var State = History.getState(); // Note: We are using History.getState() instead of event.state
+          //remove potential trailing slash then add within quotes to ensure State.url matches output of tab href attributes
+          $('.tabbed a[href="'+State.url.replace(/\/$/, "")+'/"]').tab('show');      
+        });
+        
+        //fix rev slider squished images when switching tabs
+        $(window).trigger('resize');        
+      });
+    // end tabs
+    
+    // hashtags for tabs and accordions
+      //open tab based on URL
+      //remove potential trailing slash then add within quotes to ensure window.location.href matches output of tab href attributes
+      var tabNormalizedWindowLocation = window.location.protocol + '//' + window.location.host + window.location.pathname;
+      var selector = '.tabbed a[href*="' + tabNormalizedWindowLocation + '"]';
+      $(selector).first().tab('show');
+
+    // trigger clicks for hash items to ensure all click bound handlers are also run
+      var thehash = window.location.hash.substring(1);
+      $('html.videos .video-isotope-play[href*="'+thehash+'"], .accordion-toggle[href*="'+thehash+'"]').trigger('click');        
+
+    // modals
+      window.fit_modal_body($(".modal"));
+      
+      $(window).resize(function() {
+        return window.fit_modal_body($(".modal"));
+      });
+    // end modals
+    
+    // header modals
+      
+      $('#apply-accessibility-options').click(function(){
+        $('html').toggleClass('high-contrast');
+        $('#accessibility-modal').modal('hide');
+      });
+      
+    // end header modals
+    
+    //fix firefox randomly hiding content for no reason
+    if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+      //Do Firefox-related activities
+      var ffh = $('.main').height();
+      $('.main').css('height',ffh - 1);
+      setTimeout(function(){$('.main').css('height','auto');},1);
+    }
+    
+    //alerts system
+    $('#alerts-container').load( "/wp-content/themes/georgian-college/inc/alerts.php", function( response, status, xhr ) {
+      if ( status == "error" ) {
+        //error occurred - email webteam?
+      } else if (response != "") {
+        $('#alerts-container').removeClass('hidden');
+      }
+    });
+
+    /* JOB LISTINGS */    
+      initCCESJobsTable();
+      $(document).on('click', '#cces-job-listing-table .cces-job-link a', function(e){
+        e.preventDefault();
+        $('#cces-job-modal').modal('show');        
+        var singleJobJQXHR = $.get($(this).attr('href'))
+        .done(function(data) {
+          data = $(data).find('#cces-job-listing');
+          $('#cces-modal-title').text($(e.currentTarget).text());
+          $('#cces-modal-employer').text($(data).find('p[data-job-field="Employer"]').text());
+          $('#cces-modal-content').html(data);
+        })
+        .fail(function() {
+          $('#cces-modal-title').parent('h1').html('Could not load job listing');
+          $('#cces-modal-content').html('<p>You will now be redirected to the job listing page for this job.</p>');
+          window.location.href = $(e.currentTarget).attr('href');
+        });        
+        return false; 
+      });     
+    /* END JOB LISTINGS */
+
+  }); //end doc ready  
+  
+  //js functions
+
+  function IsEmail(email) {
+    var regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+    return regex.test(email);
+  }
+
+  //adjust modal body sizes
+
+  window.fit_modal_body = function(modal) {
+    var modalBody, modalBodyPaddings, header, headerheight, footerheight, bodyheight, height, modalheight, windowHeight;
+    windowHeight = parseInt($(window).height());
+    modal.each( function(key, value) {
+      it = $(value);
+      header = it.find(".modal-header");
+      headerheight = header.length > 0 ? parseInt(header.css("height")) + parseInt(header.css("padding-top")) + parseInt(header.css("padding-bottom")) : 0;
+      modalBody = it.find(".modal-body");
+      modalBodyPaddings = modalBody.length > 0 ? parseInt(modalBody.css("padding-top")) + parseInt(modalBody.css("padding-bottom")) : 0;
+      footer = it.find(".modal-footer");
+      footerheight = footer.length > 0 ? parseInt(footer.css("height")) + parseInt(footer.css("padding-top")) + parseInt(footer.css("padding-bottom")) : 0;
+      modalheight = parseInt(modal.css("height"));
+      height = windowHeight - headerheight - footerheight - modalBodyPaddings - 150;
+      modalBody.css({"max-height": "" + height + "px", 'height':'auto'})
+    });
+    return modal;
+  };
+  
+  //progressive enhancement: animate menu button to close button
+  function animMobileMenuToggle() {
+    if($('body').hasClass('mobile-nav-open')){
+      $('#btn-mobile-nav .icon-align-justify, #btn-mobile-nav .icon-remove').addClass('rotateit');
+      setTimeout(function(){$('#btn-mobile-nav .icon-align-justify').removeClass('icon-align-justify').addClass('icon-remove');},200);
+      setTimeout(function(){$('#btn-mobile-nav .icon-remove').removeClass('rotateit');},400);        
+    } else {
+      $('#btn-mobile-nav .icon-align-justify, #btn-mobile-nav .icon-remove').addClass('rotateit');
+      setTimeout(function(){$('#btn-mobile-nav .icon-remove').removeClass('icon-remove').addClass('icon-align-justify');},200);
+      setTimeout(function(){$('#btn-mobile-nav .icon-align-justify').removeClass('rotateit');},400);
+    }
+  }
+  
+  function addTabIndexes(){
+    //tabbed navigation on main menu
+    var tabIndexCount = 1;
+    var elements;
+    $('#mobile-nav-drawer .mobile-nav-drawer-menu li, main-menu .menu li').removeAttr('tabindex');
+    if ( $("#btn-mobile-nav").is(":visible") ) {
+      elements = $('#mobile-nav-drawer .mobile-nav-drawer-menu li');
+      elements.on('blur', function(){
+        $(this).parents('li').removeClass('tabfocus');
+        $('body').removeClass('mobile-nav-open');
+      });
+      elements.on('focus', function(){  
+        $(this).parents('li').addClass('tabfocus');
+        $('body').addClass('mobile-nav-open');      
+      });
+    } else { 
+      elements = $('#main-menu .menu li');
+      elements.on('blur', function(){
+        $(this).parents('li').removeClass('tabfocus');
+      });
+      elements.on('focus', function(){  
+        $(this).parents('li').addClass('tabfocus');
+      });
+    }
+    elements.each(function(i,v){
+      $(this).attr('tabindex',tabIndexCount);
+      tabIndexCount++;
+    });       
+  }
+
+  window.getJobsData = function(cat){
+    var jobListingHTML = $.get("/community-alumni/employment-centres/jobs/"+cat)
+      .done(function(data) {
+        data = $(data).find("article.hentry .entry-content");
+        var listing = $("#cces-job-listing-div").html(data);
+        var modalJobDetail = listing.find("#cces-job-modal");
+        window.fit_modal_body(modalJobDetail);
+        initCCESJobsTable();
+      })
+      .fail(function() {
+        $("#cces-modal-title").parent("h1").html("Could not load job listings. You can view all job listings here.");
+      });
+  }
+
+  function initCCESJobsTable(){
+    jQuery('#cces-job-listing-table').dataTable({
+      "sDom": "<'row-fluid'<'span6'l><'span6'f>r>t<'row-fluid'<'span6'i><'span6'p>>",
+      "separator": "|",
+      "aaSorting": [[ 0, "asc" ]],
+      "oLanguage": {
+        "sSearch": "Search: ",
+        "sProcessing": '<img src="/wp-content/themes/georgian-college/images/ajax-loader.gif" title="Loading..." /> Loading job listings...'
+      },
+      "fnInitComplete": function(oSettings, json) {
+        jQuery("#cces-job-listing-table").removeClass('hide');
+        jQuery('#cces-job-modal').appendTo('body');
+      }
+    });
+    jQuery('#cces-job-modal').on('hidden', function () {
+      jQuery('#cces-modal-title').html('<img src="/wp-content/themes/georgian-college/images/ajax-loader.gif" title="Loading..." />');
+      jQuery('#cces-modal-employer').html('<img src="/wp-content/themes/georgian-college/images/ajax-loader.gif" title="Loading..." />');
+      jQuery('#cces-modal-content').html('<img src="/wp-content/themes/georgian-college/images/ajax-loader.gif" title="Loading..." /> Loading job listing...');
+    });
+  }  
+
+  //feedback slidedown
+  function initFeedback(){
+    //if($.cookie('hideFeedback') != 1) {
+    //  dataLayer.push({'event': 'webfeedback-slidedown'});
+    //  $('div#feedback').addClass('open');
+   // }
+
+    $('div#feedback a.submit-feedback').on('click', function(e){
+      $.cookie('hideFeedback', 1, { expires: 1 });
+      $('div#feedback').removeClass('open');
+    });
+
+    $('div#feedback a.close-feedback').on('click', function(e){      
+      $.cookie('hideFeedback', 1, { expires: 7 });
+      $('div#feedback').removeClass('open');      
+    });
+  }
+
+  //build slugs from program titles and codes
+  window.getProgramSlug = function (title, code, coop) {
+    var slug = title.replace(/[^\w\s]/gi, '').replace(/\s{2,}/g, ' ').replace(/\s/g, '-');
+    slug = ((coop >= 0 || coop == true) ? slug + "-co-op" : slug);
+    slug = slug + "-" + code.replace(/[^\w\s]/gi, '');
+    slug = slug.toLowerCase();
+    return slug;
+  };
+
+  window.resourceExists = function (url, trueFalseCallback) {
+    $.ajax({
+      type: "HEAD",
+      url: url,
+      cache: true
+    }).done(function (data, textStatus, jqXHR) {
+      trueFalseCallback(jqXHR.status == 200);
+    }).fail(function (jqXHR, textStatus, error) {
+      trueFalseCallback(false);
+    });
+  };
+})(jQuery);
+
+// function adjustMegaMenuPositioning(){    
+//   jQuery('#main-menu .menu > li').each(function(i){
+//     var menu = jQuery(this).find('.gc-mega-dropdown').offset().left + jQuery(this).find('.gc-mega-dropdown').width();
+//     var container = jQuery('.main > .container').offset().left + jQuery('.main > .container').width();
+//     if (menu > container){
+//       jQuery(this).find('.gc-mega-dropdown').css('left','-' + (menu - container + 24) + 'px'); 
+//     }    
+//   });
+// }

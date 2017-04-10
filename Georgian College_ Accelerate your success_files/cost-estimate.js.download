@@ -1,0 +1,479 @@
+Number.prototype.formatMoney = function (c, d, t) {
+    var n = this,
+        c = isNaN(c = Math.abs(c)) ? 2 : c,
+        d = d == undefined ? "." : d,
+        t = t == undefined ? "," : t,
+        s = n < 0 ? "-" : "",
+        i = parseInt(n = Math.abs(+n || 0).toFixed(c)) + "",
+        j = (j = i.length) > 3 ? j % 3 : 0;
+    return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
+};
+window.App = window.App || {};
+(function ($, app) {
+    Number.prototype.formatMoney = function(c, d, t){
+        var n = this,
+            c = isNaN(c = Math.abs(c)) ? 2 : c,
+            d = d == undefined ? "." : d,
+            t = t == undefined ? "," : t,
+            s = n < 0 ? "-" : "",
+            i = parseInt(n = Math.abs(+n || 0).toFixed(c)) + "",
+            j = (j = i.length) > 3 ? j % 3 : 0;
+        return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "jQuery1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
+    };
+    Object.byString = function(o, s) {
+        //find an object via dot notation stored in a string
+        s = s.replace(/\[(\w+)\]/g, '.jQuery1');  // convert indexes to properties
+        s = s.replace(/^\./, ''); // strip leading dot
+        var a = s.split('.');
+        while (a.length) {
+            var n = a.shift();
+            if (o && n in o) {
+                o = o[n];
+            } else {
+                return;
+            }
+        }
+        return o;
+    }
+    app.CostEstimate = app.CostEstimate ||
+    {
+        show: function () {
+            $('#cost-estimate-modal').modal('show');
+            $('article#cost-estimate').addClass("loading").removeClass("empty error ineligible");
+            $('article#cost-estimate').attr('data-campus', $(this).attr('data-campus'));
+            $('article#cost-estimate').attr('data-term', $(this).attr('data-term'));
+            $('article#cost-estimate').attr('data-program', $(this).attr('data-program'));
+            //Todo: Remove replace on api.georgiancollege.ca when server has a certificate trusted by Firefox. should be release 38 see https://bugzilla.mozilla.org/show_bug.cgi?id=849950!
+            $('article#cost-estimate').attr('data-programoffering-url', $(this).attr('data-programoffering-url').replace("api.georgiancollege.ca", "www.georgiancollege.ca"));
+            app.CostEstimate.render();
+        },
+        isFeeScheduleApproved: function (academicYear) {
+            /** Todo: Replace this date based 'fees approved' logic.
+             * Possible solutions:
+             * a) new FeePolicy resource with the new fees 'approved' indicator OR
+             * b) programOffering transient secondCareerCostEstimate that encapsulates all the responsibility of producing a cost estimate (except formatting)
+             */
+            var now = new Date(),
+                approvalDate = new Date((academicYear - 1), 1, 1); //Feb 1 the year before the academic year
+            return (now > approvalDate);
+        },
+        estimateFees: function (feeSched) {
+            /** Todo: Move this logic to the programApi service.
+             * Possible solution:
+             * a) programOffering transient secondCareerCostEstimate that encapsulates all the responsibility of producing a cost estimate (except formatting)
+             */
+            var percentage = ($('#estimatepercentage').val() || 3);
+            feeSched.domesticTuitionFee += feeSched.domesticTuitionFee * (percentage/100);
+            feeSched.internationalTuitionFee += feeSched.internationalTuitionFee * (percentage/100);
+            feeSched.estimate = true;
+            return feeSched;
+        },
+        addEstimatesAndDateBasedApprovalsToFeeData: function (programOffering) {
+            /** Todo: Move this logic to the programApi service.
+             * Possible solution:
+             * a) programOffering transient secondCareerCostEstimate that encapsulates all the responsibility of producing a cost estimate (except formatting)
+             */
+            if (programOffering._transient.fees.length == 0 || !app.CostEstimate.isFeeScheduleApproved(programOffering._transient.fees[0].academicYear)) {
+                programOffering._transient.fees = [];
+            } else {
+                $(programOffering._embedded.progression._embedded.programTerms).each(function (k, programTerm) {
+                    var programTermCode = programTerm._embedded.calendarTerms[0].code;
+                    // hack - remove fees without a semester or workterm property
+                    programOffering._transient.fees = _.filter(programOffering._transient.fees, function (fees) {
+                        return fees.workTerm || fees.semester; // ignore incomplete fee schedule
+                    });
+                    var rawFeeSched = _.find(programOffering._transient.fees, function (fees) {
+                        return fees != undefined && (fees.termCode == programTermCode);
+                    });
+                    //generate estimate
+                    if (!rawFeeSched) {
+                        var generatedFeeSched, previousYearFees;
+                        var semesterMatch = programTerm.academicLevelTitle.match(/Sem[a-zA-Z]* *([0-9])/i);
+                        var semester = semesterMatch ? semesterMatch[1] : null;
+                        if (semester && semester > 2) {
+                            previousYearFees = _.find(programOffering._transient.fees, function (fees) {
+                                /* use previous year's fees */
+                                return fees.semester == semester - 2;
+                            });
+                            if (previousYearFees) {
+                                generatedFeeSched = _.clone(previousYearFees);
+                                generatedFeeSched.semester = parseInt(previousYearFees.semester) + 2;
+                                /* Don't copy book fees since the total cost for the program is estimated in the first term */
+                                generatedFeeSched.bookFee = undefined;
+                            }
+                        } else { /* Maybe it's a work term */
+                            var workTermMatch = programTerm.academicLevelTitle.match(/Work[a-zA-Z ]* *([0-9])?/i);
+                            var workTerm = workTermMatch ? workTermMatch[1] ? Number(workTermMatch[1]) : 1 : null; // default to work term 1
+                            if (workTerm && workTerm >= 1) {
+                                switch (workTerm) {
+                                    case 1:
+                                        //work term 1 fees not set - not sure why yet - follow up with registrar
+                                        generatedFeeSched = {"workTerm": 1, "estimate": true};
+                                        break;
+                                    default:
+                                        previousYearFees = _.find(programOffering._transient.fees, function (fees) {
+                                            return fees.workTerm == workTerm - 1;
+                                        });
+                                        if (previousYearFees) {
+                                            generatedFeeSched = _.clone(previousYearFees);
+                                            generatedFeeSched.workTerm = parseInt(previousYearFees.workTerm) + 1;
+                                        }
+                                }
+                            }
+                        }
+                        if (generatedFeeSched) {
+                            generatedFeeSched.termCode = programTermCode;
+                            generatedFeeSched.academicYear = programTermCode.substring(0, 4);
+                            generatedFeeSched = app.CostEstimate.estimateFees(generatedFeeSched);
+                            programOffering._transient.fees.push(generatedFeeSched);
+                        } else {
+
+                        }
+                    }
+                });
+            }
+            return programOffering;
+        },
+        conditionalAdornment: function(adornment, conditions) {
+            for (var i = 1; i < arguments.length; i++) {
+                if (!arguments[i]) return ''; // boolean coercion
+            }
+            return adornment;
+        },
+        dollared: function(value) {
+            if (value >= 0 && value != "") {
+                return "$" + value.formatMoney(2, '.', ',');
+            } else {
+                return '';
+            }
+        },
+        directives: {
+            traverse: {
+                text: function(params){
+                    var traverse = $(params.element).attr("data-traverse");
+                    return Object.byString(this, traverse);
+                }
+            },
+            MajorDescription: {
+                text: function (params) {
+                    return this._embedded.program._embedded.programMisc._transient.displayTitle;
+                }
+            },
+            ProgramStartDate: {
+                text: function (params) {
+                    return this._embedded.startTerm.title;
+                }
+            },
+            _transient: {
+                programPolicy: {
+                    Length: {
+                        text: function (params) {
+                            return this.duration + " " + this.durationUnitOfMeasure;
+                        }
+                    },
+                    Delivery: {
+                        text: function (params) {
+                            return (this.semesterQty > 0 ? this.semesterQty + " semesters" : "") + (this.workTermQty > 0 ? ", " + this.workTermQty + " work terms" : "");
+                        }
+                    }
+                },
+                estimatePercentage: {
+                    text: function (params) {
+                        return ($('#estimatepercentage').val() || 4);
+                    }
+                },
+                grandTotal: {
+                    text: function (params) {
+                        var grandTotal = 0;
+                        var total;
+                        var estimate = false;
+                        $(this.fees).each(function (k, v) {
+                            estimate = (v.estimate || estimate ? true : false);
+                            if (this._transient) {
+                                if($(params.element).attr("data-type") == "international"){
+                                    total = this._transient.internationalFeeTotal || 0;
+                                } else {
+                                    total = this._transient.feeTotal || 0;
+                                }
+                                grandTotal += total;
+                            }
+                        });
+                        return app.CostEstimate.dollared(grandTotal);
+                    }
+                },
+                grandTotalOcas: {
+                    text: function (params) {
+                        var grandTotal = 0;
+                        var total;
+                        var estimate = false;
+                        $(this.fees).each(function (k, v) {
+                            if (this._transient && this._transient.feesOcas) {
+                                estimate = (v.estimate || estimate ? true : false);
+                                if($(params.element).attr("data-type") == "international"){
+                                    total = this._transient.feesOcas.internationalTotal || 0;
+                                } else {
+                                    total = this._transient.feesOcas.total || 0;
+                                }
+                                grandTotal += total;
+                            }
+                        });
+                        return app.CostEstimate.dollared(grandTotal);
+                    }
+                },
+                totalBook: {
+                    text: function (params) {
+                        var total = 0;
+                        $(this.fees).each(function (k, v) {
+                            total += v.bookFee ? v.bookFee : 0;
+                        });
+                        return app.CostEstimate.dollared(total);
+                    }
+                },
+                totalOtherCosts: {
+                    text: function (params) {
+                        var total = 0;
+                        $(this.fees).each(function (k, v) {
+                            total += v.otherCosts ? v.otherCosts : 0;
+                        });
+                        return app.CostEstimate.dollared(total);
+                    }
+                },
+                fees: {
+                    semesterCount: {
+                        text: function (params) {
+                            if (this.semester) {
+                                return "Sem " + this.semester;
+                            } else if (this.workTerm) {
+                                return "Work Term " + this.workTerm;
+                            }
+                        }
+                    },
+                    tuition: {
+                        text: function (params) {
+                            var fee;
+                            if ($(params.element).attr("data-type") == "international") {
+                                fee = app.CostEstimate.dollared(this.internationalTuitionFee);
+                            } else {
+                                fee = app.CostEstimate.dollared(this.domesticTuitionFee);
+                            }
+                            return fee;
+                        },
+                        html: function (params) {
+                            if ((this.workTerm || 0) > 0) {
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    },
+                    tuitionOcas: {
+                        text: function(params){
+                            if (this._transient && this._transient.feesOcas) {
+                                if($(params.element).attr("data-type") == "international"){
+                                    return app.CostEstimate.dollared(this._transient.feesOcas.internationalTuition || 0);
+                                } else {
+                                    return app.CostEstimate.dollared(this._transient.feesOcas.tuition || 0);
+                                }
+                            }
+                        },
+                        html: function(params){
+                            if((this.workTerm || 0) > 0){
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    },
+                    ancillary: {
+                        text: function (params) {
+                            if (this._transient) {
+                                var ancillaryTotal = ($(params.element).attr("data-type") == "international") ? this._transient.internationalAncillaryTotal || 0 : this._transient.ancillaryTotal || 0;
+                                return app.CostEstimate.dollared(ancillaryTotal);
+                            }
+                        },
+                        html: function (params) {
+                            if ((this.workTerm || 0) > 0) {
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    },
+                    ancillaryOcas: {
+                        text: function (params) {
+                            if (this._transient && this._transient.feesOcas) {
+                                var ancillaryTotal = ($(params.element).attr("data-type") == "international") ? this._transient.feesOcas.internationalAncillary || 0 : this._transient.feesOcas.ancillary || 0;
+                                return app.CostEstimate.dollared(ancillaryTotal);
+                            }
+                        },
+                        html: function (params) {
+                            if ((this.workTerm || 0) > 0) {
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    },
+                    term: {
+                        text: function (params) {
+                            var year = this.academicYear;
+                            if (this.season == "Fall") {
+                                year = this.academicYear - 1;
+                            }
+                            return this.season + " " + year;
+                        }
+                    },
+                    book: {
+                        text: function (params) {
+                            return app.CostEstimate.dollared(this.bookFee);
+                        }
+                    },
+                    instructional: {
+                        text: function (params) {
+                            return app.CostEstimate.dollared(this.otherCosts);
+                        }
+                    },
+                    semesterTotal: {
+                        text: function(params){
+                            if (this._transient) {
+                                var total;
+                                if($(params.element).attr("data-type") == "international"){
+                                    total = this._transient.internationalFeeTotal || 0;
+                                } else {
+                                    total = this._transient.feeTotal || 0;
+                                }
+                                return app.CostEstimate.dollared(total);
+                            }
+                        },
+                        html: function(params){
+                            if((this.workTerm || 0) > 0){
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    },
+                    semesterTotalOcas: {
+                        text: function(params){
+                            if (this._transient && this._transient.feesOcas) {
+                                var total;
+                                if ($(params.element).attr("data-type") == "international") {
+                                    total = this._transient.feesOcas.internationalTotal || 0;
+                                } else {
+                                    total = this._transient.feesOcas.total || 0;
+                                }
+                                return app.CostEstimate.dollared(total);
+                            }
+                        },
+                        html: function(params){
+                            if((this.workTerm || 0) > 0){
+                                return "<em>Work term</em>";
+                            }
+                        }
+                    }
+                }
+            },
+            _embedded: {
+                progression: {
+                    _embedded: {
+                        programTerms: {
+                            _embedded: {
+                                calendarTerms: {
+                                    startDate: {
+                                        text: function (params) {
+                                            var d = new Date(this.startDate);
+                                            return d.toDateString();
+                                        }
+                                    },
+                                    endDate: {
+                                        text: function (params) {
+                                            var d = new Date(this.endDate);
+                                            return d.toDateString();
+                                        }
+                                    },
+                                    studyWeek: {
+                                        text: function (params) {
+                                            var d = new Date(this.startDate);
+                                            d.setDate(d.getDate() + 49); //add 14 weeks for study week
+                                            if (d.getDay() != 1) {
+                                                d.setDate(d.getDate() - (d.getDay() - 1)); // set to monday of the study week
+                                            }
+                                            var d2 = new Date(d);
+                                            d2.setDate(d2.getDate() + 4);
+                                            return d.toDateString() + " - " + d2.toDateString();
+                                        }
+                                    }
+                                    ,
+                                    // todo: remove this title directive, for debugging only!
+                                    termTitle: {
+                                        text: function(params) {
+                                            var t = this.title;
+                                            return t;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            generated: {
+                text: function (params) {
+                    var d = new Date();
+                    return d.toLocaleString();
+                }
+            }
+        },
+
+        render: function () {
+            var programOfferingUrl = $("article#cost-estimate").attr("data-programoffering-url") + "?expand=campus,program,progression";
+            $.getJSON(programOfferingUrl).success(
+                function (programOfferingJSON) {
+                    var programOffering = app.CostEstimate.addEstimatesAndDateBasedApprovalsToFeeData(programOfferingJSON);
+                    if (programOffering._transient.programPolicy.secondCareerEligible) {
+                        $('#cost-estimate').render(programOffering, app.CostEstimate.directives, {debug: true});
+                        $('#cost-estimate').removeClass('loading empty');
+                    } else {
+                        $('#cost-estimate').addClass("ineligible").removeClass('loading empty');
+                    }
+                }
+            ).fail(function (jqXHR, textStatus, errorThrown) {
+                    $('#cost-estimate').addClass('error').removeClass('loading');
+                });
+        },
+        print: function () {
+            var printViaNewWindow = function (html) {
+                var printAndCloseWindowScript = "<script type='text/javascript'>" +
+                    "window.onload=function(){" +
+                    "   window.print();" +
+                    "   setTimeout( function() {" +
+                    "      window.open('', '_self', '');" +
+                    "      window.close(); " +
+                    "   }, 100);" +
+                    "};" +
+                    "<\/script>";
+                html += printAndCloseWindowScript;
+
+                var newWindow = window.open();
+                newWindow.document.write(html);
+
+                // Hack to make the print function work!
+                newWindow.location.reload(false); // from cache
+            };
+            var printViaIFrame = function (html, iframe) {
+                var iframeWindow = iframe.contentWindow ? iframe.contentWindow : iframe.contentDocument.defaultView;
+                var doc = iframeWindow.document;
+                // open the frame document and add the contents
+                doc.open();
+                doc.write(html);
+                doc.close();
+                iframeWindow.print();
+            }
+
+            // Remove the print link!
+            var article = $('article#cost-estimate').clone();
+            article.find('#print').remove();
+
+            var html = $('#the-bootstrap-css').clone().wrap('<div>').parent().html();
+            html += $('.template-styles').clone().wrap('<div>').parent().html();
+            html += article.wrap('<div>').parent().html();
+
+            if (navigator.appName == 'Microsoft Internet Explorer') {
+                printViaNewWindow(html);
+            } else {
+                printViaIFrame(html, $('#printframe')[0]);
+            }
+        }
+    };
+})
+(jQuery, window.App);

@@ -1,0 +1,210 @@
+(function() {
+IN.$extensions('AlumniFacet', function AlumniFacet() {
+  var START_URL     = 'https://www.linkedin.com/cws/alumni',
+      SCHOOL_URL    = 'https://www.linkedin.com/edu/school',
+      EDU_HUB_URL   = 'https://www.linkedin.com/edu/',
+      IFRAME_WIDTH  = 300,
+      IFRAME_HEIGHT = 250,
+      LI_SEO_DIV_CLASS = 'li-alumni-widget';
+
+  /**
+  * Facet Iframe on the page
+  * @class IN.Tags.AlumniFacet
+  * @extends IN.Tags.Base
+  * @constructor
+  * @param el {HTMLElement} the container element
+  * @param attributes {Object} the collection of attributes from the JS tag
+  */
+  Sslac.Class('IN.Tags.AlumniFacet').Extends('IN.Tags.Base').Constructor(function(el, attributes) {
+    this.Parent(el, attributes);
+    this.el = el;
+
+    var errors,
+        transforms,
+        regexes;
+
+    this.attributes = attributes;
+    this.attributesMask = null;
+    this.textValues = null;
+    this.winObj = null;
+    this.params = null;
+
+    regexes = {
+      nospace           : /^[a-z0-9\-]+@[a-z0-9\-]+\.[a-z0-9]{2,10}$/i, // no white space
+      nonumbers         : /^[^0-9]*$/, // will not match if string contains numbers
+      year              : /^((19)|(20)){1}[0-9]{2}$/i, // matches a year in range 1900-2099
+      positiveInteger   : /^[0-9]+$/, // matches a school ID.
+      countryCode       : /^[a-z]{2}$/, // matches a two character country code (must be lowercase)
+      locale            : /^[a-z_]{5-7}$/i, // need to add regex for validating locale en_US
+      notjustwhitespace : /\S/i // matches on any string that contains at least one non-whitespace character
+    };
+
+    transforms = {
+      year            : this.getTransform({ regex: regexes.year }),
+      nonumbers       : this.getTransform({ regex: regexes.nonumbers }),
+      country         : this.getTransform({ regex: regexes.countryCode, pre: function(value) { if(value && value.toLowerCase) { return value.toLowerCase(); } return value; }}),
+      positiveInteger : this.getTransform({ regex: regexes.positiveInteger })
+    };
+
+    this.attributesMask = {
+    'ipeds-schoolid'    : { required: false, transform: transforms.positiveInteger },
+    'linkedin-schoolid' : { required: false, transform: transforms.positiveInteger },
+    'autoplay'          : { required: false }
+    };
+
+    this.removeSeoLinks(el);
+
+    this.insertWidgetContent(attributes);
+  })
+
+  /**
+   * Create a transform-test function to validate data and if invalid, return a default value
+   * @method getTransform
+   */
+  .Method('getTransform',   function getTransform(args) {
+    var args          = args || {},
+        defaultValue  = args.defaultValue || '',
+        preprocess    = (typeof args.pre === 'function') ? args.pre : function(value) { return value; },
+        postprocess   = (typeof args.post === 'function') ? args.post : function(value) { return value; },
+        regex         = args.regex || /.*/;
+
+    return function(value) {
+      if(!value) value = '';
+
+      value = preprocess(value);
+
+      if(regex.test(value)) {
+        return postprocess(value);
+      } else {
+        return defaultValue;
+      }
+    }
+  })
+
+  /**
+   * Insert Frame
+   */
+  .Method('insertWidgetContent', function insertWidgetContent(config) {
+    var key,
+        data = {},
+        params,
+        queryString = '?',
+        frame,
+        url,
+        schoolUrl,
+        link,
+        linkText,
+        linkWrapper,
+        linkTrack;
+
+    config = this.propertyNamesToLowercase(config);
+    params = this.validateAttributes(config, this.attributesMask);
+
+    if (params['ipeds-schoolid']) {
+      data['ipedsId'] = params['ipeds-schoolid'];
+    }
+
+    if (params['linkedin-schoolid']) {
+      data['schoolId'] = params['linkedin-schoolid'];
+    }
+
+    url = IN.Util.appendParams(START_URL, data);
+    frame = document.createElement('iframe');
+    frame.style.overflow = 'hidden';
+    frame.style.width = IFRAME_WIDTH + 'px';
+    frame.style.height = IFRAME_HEIGHT + 'px';
+    frame.style.border = '0';
+    frame.src = url;
+    frame.scrolling = 'no';
+
+    this.el.style.border = '1px solid #ccc';
+    this.el.style.backgroundColor = '#fff';
+    this.el.style.minWidth = IFRAME_WIDTH + 'px';
+    this.el.style.maxWidth = IFRAME_WIDTH + 'px';
+    this.el.appendChild(frame);
+
+    // Append SEO link
+    /*
+    if (data['schoolId'] || data['ipedsId']) {
+      if (data['schoolId']) {
+        schoolData = {
+          'id':               data['schoolId']
+        };
+      } else {
+        schoolData = {
+          'externalId':       data['ipedsId'],
+          'externalIdType':   'IPEDS'
+        };
+      }
+      schoolUrl = IN.Util.appendParams(SCHOOL_URL, schoolData);
+      linkText = 'Visit this school on LinkedIn';
+      linkTrack = 'alumni-widget-visit-school';
+    } else {
+      schoolUrl = EDU_HUB_URL;
+      linkText = 'Visit your school on LinkedIn';
+      linkTrack = 'alumni-widget-visit-hub';
+    }
+
+    schoolUrl = IN.Util.appendParams(schoolUrl, {trk: linkTrack});
+
+    link = document.createElement('a');
+    link.href = schoolUrl;
+    if ('innerText' in link) {
+      link.innerText = linkText;
+    } else {
+      link.textContent = linkText;
+    }
+    link.style.fontFamily = 'Helvetica,Arial,sans-serif';
+    link.style.fontSize = '12px';
+    link.style.color = '#0077b5';
+    link.target = '_blank';
+    linkWrapper = document.createElement('div');
+    linkWrapper.appendChild(link);
+    linkWrapper.style.textAlign = 'center';
+    linkWrapper.style.padding = '8px';
+    linkWrapper.style.backgroundColor = '#fff';
+
+    this.el.appendChild(linkWrapper);
+    */
+  })
+
+  .Method('removeSeoLinks', function (widgetEl) {
+    var widgetContainerEl = widgetEl.parentNode,
+        widgetContainerChildNodes = widgetContainerEl.childNodes,
+        numChildNodes = widgetContainerChildNodes.length,
+        i = 0,
+        childNode;
+
+    while (!(i === numChildNodes)) {
+      childNode = widgetContainerChildNodes[i];
+      if (childNode && childNode.className === LI_SEO_DIV_CLASS) {
+        widgetContainerEl.removeChild(childNode);
+        numChildNodes--;
+        i--;
+      }
+      i++;
+    }
+  })
+
+  /**
+  * Make all property names on object lowercase. You WILL lose data if you have dupe
+  * property names of different cases (e.g., obj.firstName and obj.firstname)
+  * @param obj {Object} the object to convert
+  */
+  .Method('propertyNamesToLowercase', function (obj) {
+    var plower,
+        newObj = {};
+
+    for(var p in obj) {
+      if(obj.hasOwnProperty(p)) {
+        plower = p.toLowerCase();
+        newObj[plower] = obj[p];
+      }
+    }
+
+    return newObj;
+  });
+
+  IN.addTag('AlumniFacet', IN.Tags.AlumniFacet);
+});
+}());
